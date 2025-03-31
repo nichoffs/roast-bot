@@ -5,6 +5,8 @@ backend/data/*.db
 backend/*.egg-info/
 backend/dist/
 backend/build/
+rabspberry_pi/.venv/
+rabspberry_pi/__pycache__/
 
 # Node.js
 frontend/node_modules/
@@ -29,6 +31,7 @@ frontend/.env.local
 frontend/.env.development.local
 frontend/.env.test.local
 frontend/.env.production.local
+rabspberry_pi/.env
 
 # IDE / OS specific
 .vscode/
