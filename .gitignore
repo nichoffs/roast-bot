@@ -1,3 +1,5 @@
+*/.venv/
+
 # Python
 backend/.venv/
 backend/__pycache__/
