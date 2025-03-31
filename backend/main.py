@@ -16,7 +16,6 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse, HTMLResponse
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.templating import Jinja2Templates
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr, Field
@@ -619,51 +618,6 @@ async def get_all_user_roasts(
     return all_roasts
 
 
-@app.get("/debug/roast-configs")
-async def debug_roast_configs(current_user: dict = Depends(get_current_user)):
-    # Get all configs from database
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute("SELECT COUNT(*) as count FROM users")
-    users_count = cursor.fetchone()["count"]
-    
-    cursor.execute(
-        """
-        SELECT *
-        FROM roast_configs
-        WHERE user_id = ?
-        """,
-        (current_user["id"],)
-    )
-    current_user_configs = cursor.fetchall()
-    
-    cursor.execute("SELECT * FROM roast_configs")
-    all_configs = cursor.fetchall()
-    
-    conn.close()
-    
-    # Format configs for response
-    formatted_configs = {}
-    for config in all_configs:
-        user_id = config["user_id"]
-        target_id = config["target_user_id"]
-        
-        if user_id not in formatted_configs:
-            formatted_configs[user_id] = {}
-            
-        formatted_configs[user_id][target_id] = {
-            "topics": json.loads(config["topics"]),
-            "style": config["style"]
-        }
-    
-    return {
-        "roast_configs_db": formatted_configs,
-        "users_count": users_count,
-        "current_user_configs": current_user_configs
-    }
-
-
 @app.post("/users/me/profile-image")
 async def update_profile_image(
     image_data: str = Body(..., embed=True),
@@ -1238,19 +1192,6 @@ async def get_public_video_stream(
 @app.get("/")
 async def root():
     return {"message": "Welcome to the Roast Bot API"}
-
-@app.get("/viewer", response_class=HTMLResponse)
-async def get_stream_viewer(request: Request):
-    """
-    Serve the HTML stream viewer page
-    
-    Args:
-        request: FastAPI request object
-        
-    Returns:
-        HTMLResponse: HTML page for stream viewing
-    """
-    return templates.TemplateResponse("stream_viewer.html", {"request": request})
 
 if __name__ == "__main__":
     import uvicorn
