@@ -342,8 +342,7 @@ def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
     return user
 
 
-def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
-    """Get user by ID from the database"""
+def get_user_by_id(user_id: str):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
@@ -538,7 +537,7 @@ async def roast_user(
     target_user_id: str, config: RoastConfig, current_user: dict = Depends(get_current_user)
 ):
     user_id = current_user["id"]
-    
+
     # Check if target user exists
     target_user = get_user_by_id(target_user_id)
     if not target_user:
@@ -671,7 +670,7 @@ async def update_user_profile(
     current_user: dict = Depends(get_current_user)
 ):
     user_id = current_user["id"]
-    
+
     # Update user fields in database
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -1141,7 +1140,7 @@ async def get_stream_feed(
     
     return active_streams[stream_id]["analysis"]
 
-@app.get("/api/stream/{stream_id}/video")
+@app.get("/api/stream/{stream_id}")
 async def get_video_stream(
     stream_id: str,
     current_user: dict = Depends(get_current_user)
@@ -1187,6 +1186,58 @@ async def get_public_video_stream(
         stream_frames_generator(stream_id),
         media_type="multipart/x-mixed-replace; boundary=frame"
     )
+
+@app.post("/api/raspi/upload_frame")
+async def upload_frame(
+    stream_id: str = Form(...),
+    frame: UploadFile = File(...)
+):
+    """
+    Endpoint for Raspberry Pi to upload video frames directly from PiCamera
+    
+    Args:
+        stream_id: Identifier for the camera/stream
+        frame: Image file uploaded from the Raspberry Pi
+        
+    Returns:
+        dict: Status response
+    """
+    try:
+        # Read the frame data
+        img_bytes = await frame.read()
+        
+        # Process with DeepFace (placeholder for now)
+        try:
+            # Convert bytes to image for analysis
+            img = Image.open(io.BytesIO(img_bytes))
+            frame_array = np.array(img)
+            
+            # Analyze with DeepFace (placeholder)
+            analysis = deepface_analyze(frame_array)
+            
+            # Store the active stream information
+            with stream_lock:
+                active_streams[stream_id] = {
+                    "last_frame": time.time(),
+                    "analysis": analysis
+                }
+                
+                # Add frame to the stream's frame queue
+                if stream_id not in stream_frames:
+                    stream_frames[stream_id] = deque(maxlen=30)  # Store last 30 frames
+                stream_frames[stream_id].append(img_bytes)
+            
+            return {"status": "received", "analysis": "success"}
+        
+        except Exception as e:
+            print(f"Error processing frame: {e}")
+            return {"status": "received", "analysis": "failed", "error": str(e)}
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid image data: {str(e)}"
+        )
 
 # Root endpoint for testing
 @app.get("/")
