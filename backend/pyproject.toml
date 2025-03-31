@@ -5,17 +5,20 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "fastapi>=0.115.12",
+    "fastapi>=0.115.0",
     "uvicorn>=0.34.0",
-    "python-jose>=3.4.0",
-    "passlib>=1.7.4",
+    "python-jose[cryptography]>=3.4.0",
+    "passlib[bcrypt]>=1.7.4",
     "python-multipart>=0.0.20",
-    "pydantic>=2.11.0",
+    "pydantic[email]>=2.11.0",
     "email-validator>=2.2.0",
     "bcrypt>=4.3.0",
     "python-dotenv>=1.1.0",
     "openai>=1.69.0",
-    "elevenlabs>=1.55.0",
+    "elevenlabs>=1.5.0",
+    "requests>=2.31.0",
+    "pillow>=10.0.0",
+    "numpy>=1.24.0",
 ]
 
 [build-system]
