@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RoastBot Stream Viewer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .stream-container {
+            margin: 20px 0;
+            text-align: center;
+        }
+        .video-stream {
+            max-width: 100%;
+            border: 1px solid #ccc;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .analysis {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+        }
+        .status {
+            margin: 15px 0;
+            font-weight: bold;
+        }
+        .stream-select {
+            margin: 20px 0;
+            padding: 10px;
+            text-align: center;
+        }
+        select, button {
+            padding: 8px 12px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <h1>RoastBot Stream Viewer</h1>
+    
+    <div class="stream-select">
+        <select id="streamSelect">
+            <option value="">Select a stream...</option>
+        </select>
+        <button id="refreshStreams">Refresh Streams</button>
+    </div>
+    
+    <div class="status" id="status">No stream selected</div>
+    
+    <div class="stream-container">
+        <img id="videoStream" class="video-stream" alt="Video stream will appear here" src="">
+    </div>
+    
+    <div class="analysis" id="analysis">
+        <h3>Analysis Results</h3>
+        <div id="analysisData">Select a stream to view analysis</div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_KEY = 'raspberry_secret_key'; // Should be set properly in production
+        let currentStreamId = null;
+        let analysisInterval = null;
+        
+        // DOM Elements
+        const streamSelect = document.getElementById('streamSelect');
+        const refreshButton = document.getElementById('refreshStreams');
+        const statusElement = document.getElementById('status');
+        const videoElement = document.getElementById('videoStream');
+        const analysisDataElement = document.getElementById('analysisData');
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadAvailableStreams();
+            
+            // Event listeners
+            refreshButton.addEventListener('click', loadAvailableStreams);
+            streamSelect.addEventListener('change', changeStream);
+        });
+        
+        // Load available streams
+        async function loadAvailableStreams() {
+            try {
+                statusElement.textContent = 'Loading available streams...';
+                
+                // This would typically be authenticated, but for simplicity we're using the public endpoint
+                const response = await fetch('/api/streams');
+                const streams = await response.json();
+                
+                // Clear existing options
+                streamSelect.innerHTML = '<option value="">Select a stream...</option>';
+                
+                // Add stream options
+                Object.keys(streams).forEach(streamId => {
+                    const option = document.createElement('option');
+                    option.value = streamId;
+                    option.textContent = `Stream ${streamId} (active for ${Math.round(streams[streamId].active_since)} seconds)`;
+                    streamSelect.appendChild(option);
+                });
+                
+                statusElement.textContent = Object.keys(streams).length > 0 
+                    ? 'Select a stream to view' 
+                    : 'No active streams found';
+            } catch (error) {
+                statusElement.textContent = `Error loading streams: ${error.message}`;
+                console.error('Error loading streams:', error);
+            }
+        }
+        
+        // Change the active stream
+        function changeStream() {
+            const streamId = streamSelect.value;
+            
+            // Clear any existing analysis polling
+            if (analysisInterval) {
+                clearInterval(analysisInterval);
+                analysisInterval = null;
+            }
+            
+            if (!streamId) {
+                currentStreamId = null;
+                videoElement.src = '';
+                analysisDataElement.textContent = 'Select a stream to view analysis';
+                statusElement.textContent = 'No stream selected';
+                return;
+            }
+            
+            currentStreamId = streamId;
+            statusElement.textContent = `Viewing stream: ${streamId}`;
+            
+            // Set the video source to the public stream endpoint
+            videoElement.src = `/api/public-stream/${streamId}/${API_KEY}`;
+            
+            // Start polling for analysis data
+            fetchAnalysisData();
+            analysisInterval = setInterval(fetchAnalysisData, 5000);
+        }
+        
+        // Fetch analysis data for the current stream
+        async function fetchAnalysisData() {
+            if (!currentStreamId) return;
+            
+            try {
+                const response = await fetch(`/api/stream/${currentStreamId}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // Format and display the analysis data
+                let html = '<table>';
+                Object.entries(data).forEach(([key, value]) => {
+                    if (key === 'emotion' || key === 'race') {
+                        // Format nested objects
+                        let subHtml = '<ul>';
+                        Object.entries(value).forEach(([subKey, subValue]) => {
+                            subHtml += `<li>${subKey}: ${(subValue * 100).toFixed(1)}%</li>`;
+                        });
+                        subHtml += '</ul>';
+                        html += `<tr><td><strong>${key}</strong></td><td>${subHtml}</td></tr>`;
+                    } else if (key === 'timestamp') {
+                        // Format timestamp
+                        const date = new Date(value * 1000);
+                        html += `<tr><td><strong>${key}</strong></td><td>${date.toLocaleTimeString()}</td></tr>`;
+                    } else {
+                        html += `<tr><td><strong>${key}</strong></td><td>${value}</td></tr>`;
+                    }
+                });
+                html += '</table>';
+                
+                analysisDataElement.innerHTML = html;
+            } catch (error) {
+                analysisDataElement.textContent = `Error fetching analysis: ${error.message}`;
+                console.error('Error fetching analysis:', error);
+            }
+        }
+    </script>
+</body>
+</html> 
